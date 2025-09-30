@@ -72,12 +72,17 @@ hr.soft{border:none; border-top:1px solid var(--border); margin:8px 0 10px;}
 # HELPERS
 # ===========================
 def normalize_name(s: str) -> str:
-    if pd.isna(s): 
+    if pd.isna(s):
         return ""
     s = str(s).strip()
-    s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
-    s = " ".join(s.split())
-    return s.upper()
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = s.upper()
+    # quita puntuación común pero mantiene dígitos y letras
+    s = re.sub(r"[\/\-\–\—\.\,\;\:\(\)\[\]\_]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
 
 def _norm_header(s: str) -> str:
     if s is None: return ""
@@ -666,7 +671,11 @@ def tarjeta_ferreteria(ferreteria: dict, es_mejor: bool = False):
         st.markdown(f"<div class='small'>{it['producto']} × {it['cantidad']}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='small' style='color:#7cb7ff;font-weight:600;'>"
                     f"{mon(it['pt'])} ({mon(it['pu'])} c/u)</div>", unsafe_allow_html=True)
-
+    if ferreteria.get("faltantes"):
+      st.markdown("<hr class='soft'/>", unsafe_allow_html=True)
+      st.markdown("<b>Productos no encontrados o sin precio</b>", unsafe_allow_html=True)
+      for nf in ferreteria["faltantes"]:
+          st.markdown(f"<div class='small' style='color:#f28b82;'>• {nf}</div>", unsafe_allow_html=True)
     pdf_bytes = pdf_proforma_bytes(ferreteria, st.session_state["ubicacion"])
     st.markdown("<div class='btn-primary'>", unsafe_allow_html=True)
     st.download_button(
@@ -786,4 +795,5 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
