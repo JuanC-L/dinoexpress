@@ -86,51 +86,53 @@ def normalize_name(s: str) -> str:
 # ---- helper robusto para limpiar/parsear precios ----
 def coerce_price(col: pd.Series) -> pd.Series:
     """
-    Convierte a número valores tipo 'S/ 1.234,56', 'S/ 1,234.56', '9,50', '14.60', 'S/'.
-    Devuelve float con NaN si no hay número.
+    Convierte valores como 'S/ 1.234,56', 'S/ 1,234.56', '9,50', '14.60', 'S/' en float.
+    Devuelve NaN cuando no hay número.
     """
-    s = col.astype(str).str.strip()
-    # normaliza vacíos/comunes
+    # Mantén <NA> reales y trabaja en string
+    s = col.astype("string").str.strip()
     s = s.replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA, 'NaN': pd.NA})
-    # elimina todo excepto dígitos, coma, punto y signo
+
+    # Deja sólo dígitos, coma, punto y signo
     s = s.str.replace(r"[^\d\.,\-]", "", regex=True)
-    def _fix(x: str):
-        if x is None or x == "" or x is pd.NA:
+
+    def _fix(x):
+        # ⚠️ clave: primero detecta NA sin compararlo con cadenas
+        if pd.isna(x):
             return None
         x = str(x)
-        # caso con punto y coma -> el decimal es el último separador
+
+        # Tiene coma y punto -> el último separador es el decimal
         if "," in x and "." in x:
             last = max(x.rfind(","), x.rfind("."))
             int_part = re.sub(r"[^\d]", "", x[:last])
             dec_part = re.sub(r"[^\d]", "", x[last+1:])
-            if dec_part == "":
-                return int_part
-            return f"{int_part}.{dec_part}"
-        # solo comas
+            return f"{int_part}.{dec_part}" if dec_part else int_part
+
+        # Sólo comas
         if "," in x:
             parts = x.split(",")
-            # si parece decimal (una coma y 1-2 dígitos al final)
-            if len(parts) == 2 and len(parts[1]) in (1, 2):
+            if len(parts) == 2 and len(parts[1]) in (1, 2):  # decimal tipo "9,50"
                 int_part = re.sub(r"[^\d]", "", parts[0])
                 dec_part = re.sub(r"[^\d]", "", parts[1])
                 return f"{int_part}.{dec_part}"
-            # asume comas de miles -> quita todo menos dígitos
+            # comas de miles
             return re.sub(r"[^\d]", "", x)
 
-        # solo puntos
+        # Sólo puntos
         if "." in x:
             parts = x.split(".")
-            # un solo punto y 1-2 dígitos al final -> decimal
-            if len(parts) == 2 and len(parts[1]) in (1, 2):
+            if len(parts) == 2 and len(parts[1]) in (1, 2):  # decimal tipo "14.60"
                 return x
-            # puntos como miles -> quita todo menos dígitos
+            # puntos de miles
             return re.sub(r"[^\d]", "", x)
 
-        # solo dígitos (o signo)
+        # Sólo dígitos (o signo)
         return x
 
     s = s.map(_fix)
     return pd.to_numeric(s, errors="coerce")
+
   
 def _norm_header(s: str) -> str:
     if s is None: return ""
@@ -844,6 +846,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
