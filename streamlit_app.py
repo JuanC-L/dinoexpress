@@ -133,6 +133,60 @@ def init_state():
     ss.setdefault("filtro_marca", "Todas")
 init_state()
 
+# ---- helper robusto para limpiar/parsear precios ----
+def coerce_price(col: pd.Series) -> pd.Series:
+    """
+    Convierte a número valores tipo 'S/ 1.234,56', 'S/ 1,234.56', '9,50', '14.60', 'S/'.
+    Devuelve float con NaN si no hay número.
+    """
+    s = col.astype(str).str.strip()
+    # normaliza vacíos/comunes
+    s = s.replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA, 'NaN': pd.NA})
+
+    # elimina todo excepto dígitos, coma, punto y signo
+    s = s.str.replace(r"[^\d\.,\-]", "", regex=True)
+
+    def _fix(x: str):
+        if x is None or x == "" or x is pd.NA:
+            return None
+
+        x = str(x)
+
+        # caso con punto y coma -> el decimal es el último separador
+        if "," in x and "." in x:
+            last = max(x.rfind(","), x.rfind("."))
+            int_part = re.sub(r"[^\d]", "", x[:last])
+            dec_part = re.sub(r"[^\d]", "", x[last+1:])
+            if dec_part == "":
+                return int_part
+            return f"{int_part}.{dec_part}"
+
+        # solo comas
+        if "," in x:
+            parts = x.split(",")
+            # si parece decimal (una coma y 1-2 dígitos al final)
+            if len(parts) == 2 and len(parts[1]) in (1, 2):
+                int_part = re.sub(r"[^\d]", "", parts[0])
+                dec_part = re.sub(r"[^\d]", "", parts[1])
+                return f"{int_part}.{dec_part}"
+            # asume comas de miles -> quita todo menos dígitos
+            return re.sub(r"[^\d]", "", x)
+
+        # solo puntos
+        if "." in x:
+            parts = x.split(".")
+            # un solo punto y 1-2 dígitos al final -> decimal
+            if len(parts) == 2 and len(parts[1]) in (1, 2):
+                return x
+            # puntos como miles -> quita todo menos dígitos
+            return re.sub(r"[^\d]", "", x)
+
+        # solo dígitos (o signo)
+        return x
+
+    s = s.map(_fix)
+    return pd.to_numeric(s, errors="coerce")
+
 # ===========================
 # LECTURA EXCEL
 # ===========================
@@ -159,9 +213,14 @@ def leer_excel(path):
             if col_cat:  rename_map[col_cat]  = "Categoria"
             if col_marc: rename_map[col_marc] = "Marca"
             precios_df = df.rename(columns=rename_map).copy()
-            precios_df["Precio"] = pd.to_numeric(precios_df["Precio"], errors="coerce")
+
+            # ⬇️ limpieza robusta de precios
+            precios_df["Precio"] = coerce_price(precios_df["Precio"])
+
             precios_df["__JOIN_KEY__"] = precios_df["Ferreteria"].apply(normalize_name)
             break
+
+    # ... (resto de tu función igual)
 
     # COORDENADAS
     coords_df = None
@@ -795,5 +854,6 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
