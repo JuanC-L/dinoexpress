@@ -304,15 +304,28 @@ def resumen_por_ferreteria(filtrado: pd.DataFrame, carrito: dict):
     if filtrado.empty or not carrito: return out
     grp = filtrado.groupby(["Ferreteria", "latitud", "longitud"])
     for (ferre, lat, lon), g in grp:
-        precios = dict(zip(g["Producto"], g["Precio"]))
+        # Crear diccionario normalizado: clave normalizada -> (producto original, precio)
+        precios_norm = {}
+        for _, row in g.iterrows():
+            prod_orig = row["Producto"]
+            precio = row["Precio"]
+            prod_norm = normalize_name(str(prod_orig))
+            if prod_norm:
+                precios_norm[prod_norm] = (prod_orig, precio)
+        
         total = 0.0
         detalle, faltantes = [], []
         for prod, cant in carrito.items():
             if cant <= 0: continue
-            if prod in precios and not pd.isna(precios[prod]):
-                pu = float(precios[prod]); pt = pu * cant
-                total += pt
-                detalle.append({"producto": prod, "cantidad": cant, "pu": pu, "pt": pt})
+            prod_norm = normalize_name(str(prod))
+            if prod_norm in precios_norm:
+                prod_orig, precio = precios_norm[prod_norm]
+                if not pd.isna(precio):
+                    pu = float(precio); pt = pu * cant
+                    total += pt
+                    detalle.append({"producto": prod_orig, "cantidad": cant, "pu": pu, "pt": pt})
+                else:
+                    faltantes.append(prod)
             else:
                 faltantes.append(prod)
         if detalle:
@@ -773,3 +786,4 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
