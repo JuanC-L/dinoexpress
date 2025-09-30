@@ -92,16 +92,12 @@ def coerce_price(col: pd.Series) -> pd.Series:
     s = col.astype(str).str.strip()
     # normaliza vacíos/comunes
     s = s.replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA, 'NaN': pd.NA})
-
     # elimina todo excepto dígitos, coma, punto y signo
     s = s.str.replace(r"[^\d\.,\-]", "", regex=True)
-
     def _fix(x: str):
         if x is None or x == "" or x is pd.NA:
             return None
-
         x = str(x)
-
         # caso con punto y coma -> el decimal es el último separador
         if "," in x and "." in x:
             last = max(x.rfind(","), x.rfind("."))
@@ -110,7 +106,6 @@ def coerce_price(col: pd.Series) -> pd.Series:
             if dec_part == "":
                 return int_part
             return f"{int_part}.{dec_part}"
-
         # solo comas
         if "," in x:
             parts = x.split(",")
@@ -213,7 +208,8 @@ def leer_excel(path):
             if col_cat:  rename_map[col_cat]  = "Categoria"
             if col_marc: rename_map[col_marc] = "Marca"
             precios_df = df.rename(columns=rename_map).copy()
-            precios_df["Precio"] = pd.to_numeric(precios_df["Precio"], errors="coerce")
+            #precios_df["Precio"] = pd.to_numeric(precios_df["Precio"], errors="coerce")
+            precios_df["Precio"] = coerce_price(precios_df["Precio"])
             precios_df["__JOIN_KEY__"] = precios_df["Ferreteria"].apply(normalize_name)
             break
     # COORDENADAS
@@ -848,6 +844,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
