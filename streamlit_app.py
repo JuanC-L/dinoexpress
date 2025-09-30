@@ -213,15 +213,9 @@ def leer_excel(path):
             if col_cat:  rename_map[col_cat]  = "Categoria"
             if col_marc: rename_map[col_marc] = "Marca"
             precios_df = df.rename(columns=rename_map).copy()
-
-            # ⬇️ limpieza robusta de precios
-            precios_df["Precio"] = coerce_price(precios_df["Precio"])
-
+            precios_df["Precio"] = pd.to_numeric(precios_df["Precio"], errors="coerce")
             precios_df["__JOIN_KEY__"] = precios_df["Ferreteria"].apply(normalize_name)
             break
-
-    # ... (resto de tu función igual)
-
     # COORDENADAS
     coords_df = None
     for sh, df in frames.items():
@@ -854,6 +848,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
