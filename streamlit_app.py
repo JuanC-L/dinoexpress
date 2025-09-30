@@ -83,56 +83,6 @@ def normalize_name(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-
-def _norm_header(s: str) -> str:
-    if s is None: return ""
-    s = "".join(c for c in unicodedata.normalize("NFD", str(s)) if unicodedata.category(c) != "Mn")
-    s = re.sub(r"[:;,\.\-–—]+", " ", s)
-    s = " ".join(s.strip().upper().split())
-    return s
-
-def resolve_col(df: pd.DataFrame, aliases: list[str]) -> str | None:
-    norm_cols = {_norm_header(c): c for c in df.columns}
-    for a in aliases:
-        a_norm = _norm_header(a)
-        if a_norm in norm_cols:
-            return norm_cols[a_norm]
-    for a in aliases:
-        a_norm = _norm_header(a)
-        for nc, real in norm_cols.items():
-            if a_norm in nc:
-                return real
-    return None
-
-def render_center_logo(width=240):
-    c1, c2, c3 = st.columns([1,1,1])
-    with c2:
-        try:
-            st.image(LOGO_PATH, width=width)
-        except Exception:
-            pass
-
-def render_header(title: str, subtitle: str = ""):
-    render_center_logo(width=240)
-    st.markdown(f"<h1 class='main-header'>{title}</h1>", unsafe_allow_html=True)
-    if subtitle:
-        st.markdown(f"<div class='subtle'>{subtitle}</div>", unsafe_allow_html=True)
-
-# ===========================
-# ESTADO
-# ===========================
-def init_state():
-    ss = st.session_state
-    ss.setdefault("paso", "home")
-    ss.setdefault("carrito", {})
-    ss.setdefault("ubicacion", {"lat": -12.0675, "lon": -77.0333, "direccion": "Lima, Perú"})
-    ss.setdefault("radio_km", 3)
-    ss.setdefault("last_click_ts", 0.0)
-    ss.setdefault("mostrar_todas_en_mapa", True)
-    ss.setdefault("filtro_categoria", "Todas")
-    ss.setdefault("filtro_marca", "Todas")
-init_state()
-
 # ---- helper robusto para limpiar/parsear precios ----
 def coerce_price(col: pd.Series) -> pd.Series:
     """
@@ -186,6 +136,56 @@ def coerce_price(col: pd.Series) -> pd.Series:
 
     s = s.map(_fix)
     return pd.to_numeric(s, errors="coerce")
+  
+def _norm_header(s: str) -> str:
+    if s is None: return ""
+    s = "".join(c for c in unicodedata.normalize("NFD", str(s)) if unicodedata.category(c) != "Mn")
+    s = re.sub(r"[:;,\.\-–—]+", " ", s)
+    s = " ".join(s.strip().upper().split())
+    return s
+
+def resolve_col(df: pd.DataFrame, aliases: list[str]) -> str | None:
+    norm_cols = {_norm_header(c): c for c in df.columns}
+    for a in aliases:
+        a_norm = _norm_header(a)
+        if a_norm in norm_cols:
+            return norm_cols[a_norm]
+    for a in aliases:
+        a_norm = _norm_header(a)
+        for nc, real in norm_cols.items():
+            if a_norm in nc:
+                return real
+    return None
+
+def render_center_logo(width=240):
+    c1, c2, c3 = st.columns([1,1,1])
+    with c2:
+        try:
+            st.image(LOGO_PATH, width=width)
+        except Exception:
+            pass
+
+def render_header(title: str, subtitle: str = ""):
+    render_center_logo(width=240)
+    st.markdown(f"<h1 class='main-header'>{title}</h1>", unsafe_allow_html=True)
+    if subtitle:
+        st.markdown(f"<div class='subtle'>{subtitle}</div>", unsafe_allow_html=True)
+
+# ===========================
+# ESTADO
+# ===========================
+def init_state():
+    ss = st.session_state
+    ss.setdefault("paso", "home")
+    ss.setdefault("carrito", {})
+    ss.setdefault("ubicacion", {"lat": -12.0675, "lon": -77.0333, "direccion": "Lima, Perú"})
+    ss.setdefault("radio_km", 3)
+    ss.setdefault("last_click_ts", 0.0)
+    ss.setdefault("mostrar_todas_en_mapa", True)
+    ss.setdefault("filtro_categoria", "Todas")
+    ss.setdefault("filtro_marca", "Todas")
+init_state()
+
 
 # ===========================
 # LECTURA EXCEL
@@ -854,6 +854,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
