@@ -324,14 +324,16 @@ def dist_km(a_lat, a_lon, b_lat, b_lon):
 
 @st.cache_data(show_spinner=False)
 def geocode_once(q):
-    if not q or not q.strip(): return None
+    if not q or not q.strip(): 
+        return None
     try:
         geocoder = Nominatim(user_agent="dino_pacasmayo_app", timeout=10)
         for query in [q.strip(), f"{q.strip()}, Lima, Perú", f"{q.strip()}, Perú"]:
             try:
                 loc = geocoder.geocode(query, timeout=8)
                 if loc:
-                    return {"lat": loc.latitude, "lon": loc.longitude, "direccion": loc.address}
+                    result = {"lat": loc.latitude, "lon": loc.longitude, "direccion": loc.address}
+                    return result
             except (GeocoderTimedOut, GeocoderUnavailable, GeocoderServiceError):
                 continue
     except Exception as e:
@@ -846,6 +848,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
