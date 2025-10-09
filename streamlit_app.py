@@ -322,7 +322,6 @@ base_df, precios_df, coords_df, info_df, info_lookup = leer_excel(EXCEL_PATH)
 def dist_km(a_lat, a_lon, b_lat, b_lon):
     return geodesic((a_lat, a_lon), (b_lat, b_lon)).kilometers
 
-
 @st.cache_data(show_spinner=False)
 def geocode_once(q):
     if not q or not q.strip(): return None
@@ -338,7 +337,6 @@ def geocode_once(q):
     except Exception as e:
         print(f"Geocode error: {e}")
     return None
-
 
 def geocodificar_inverso(lat, lon):
     try:
@@ -848,9 +846,6 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
-
-
-
 
 
 
