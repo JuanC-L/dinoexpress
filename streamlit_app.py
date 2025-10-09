@@ -78,62 +78,42 @@ def normalize_name(s: str) -> str:
     s = unicodedata.normalize("NFD", s)
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
     s = s.upper()
-    # quita puntuación común pero mantiene dígitos y letras
     s = re.sub(r"[\/\-\–\—\.\,\;\:\(\)\[\]\_]+", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-# ---- helper robusto para limpiar/parsear precios ----
 def coerce_price(col: pd.Series) -> pd.Series:
-    """
-    Convierte valores como 'S/ 1.234,56', 'S/ 1,234.56', '9,50', '14.60', 'S/' en float.
-    Devuelve NaN cuando no hay número.
-    """
-    # Mantén <NA> reales y trabaja en string
+    """Convierte valores como 'S/ 1.234,56', 'S/ 1,234.56', '9,50', '14.60', 'S/' en float."""
     s = col.astype("string").str.strip()
     s = s.replace({'': pd.NA, 'nan': pd.NA, 'None': pd.NA, 'NaN': pd.NA})
-
-    # Deja sólo dígitos, coma, punto y signo
     s = s.str.replace(r"[^\d\.,\-]", "", regex=True)
 
     def _fix(x):
-        # ⚠️ clave: primero detecta NA sin compararlo con cadenas
         if pd.isna(x):
             return None
         x = str(x)
-
-        # Tiene coma y punto -> el último separador es el decimal
         if "," in x and "." in x:
             last = max(x.rfind(","), x.rfind("."))
             int_part = re.sub(r"[^\d]", "", x[:last])
             dec_part = re.sub(r"[^\d]", "", x[last+1:])
             return f"{int_part}.{dec_part}" if dec_part else int_part
-
-        # Sólo comas
         if "," in x:
             parts = x.split(",")
-            if len(parts) == 2 and len(parts[1]) in (1, 2):  # decimal tipo "9,50"
+            if len(parts) == 2 and len(parts[1]) in (1, 2):
                 int_part = re.sub(r"[^\d]", "", parts[0])
                 dec_part = re.sub(r"[^\d]", "", parts[1])
                 return f"{int_part}.{dec_part}"
-            # comas de miles
             return re.sub(r"[^\d]", "", x)
-
-        # Sólo puntos
         if "." in x:
             parts = x.split(".")
-            if len(parts) == 2 and len(parts[1]) in (1, 2):  # decimal tipo "14.60"
+            if len(parts) == 2 and len(parts[1]) in (1, 2):
                 return x
-            # puntos de miles
             return re.sub(r"[^\d]", "", x)
-
-        # Sólo dígitos (o signo)
         return x
 
     s = s.map(_fix)
     return pd.to_numeric(s, errors="coerce")
 
-  
 def _norm_header(s: str) -> str:
     if s is None: return ""
     s = "".join(c for c in unicodedata.normalize("NFD", str(s)) if unicodedata.category(c) != "Mn")
@@ -183,7 +163,6 @@ def init_state():
     ss.setdefault("filtro_marca", "Todas")
 init_state()
 
-
 # ===========================
 # LECTURA EXCEL
 # ===========================
@@ -210,10 +189,10 @@ def leer_excel(path):
             if col_cat:  rename_map[col_cat]  = "Categoria"
             if col_marc: rename_map[col_marc] = "Marca"
             precios_df = df.rename(columns=rename_map).copy()
-            #precios_df["Precio"] = pd.to_numeric(precios_df["Precio"], errors="coerce")
             precios_df["Precio"] = coerce_price(precios_df["Precio"])
             precios_df["__JOIN_KEY__"] = precios_df["Ferreteria"].apply(normalize_name)
             break
+
     # COORDENADAS
     coords_df = None
     for sh, df in frames.items():
@@ -328,26 +307,46 @@ def geocode_once(q):
         return None
     try:
         geocoder = Nominatim(user_agent="dino_pacasmayo_app", timeout=10)
-        for query in [q.strip(), f"{q.strip()}, Lima, Perú", f"{q.strip()}, Perú"]:
+        queries = [
+            q.strip(),
+            f"{q.strip()}, Lima",
+            f"{q.strip()}, Lima, Perú",
+            f"{q.strip()}, Perú"
+        ]
+        
+        for query in queries:
             try:
                 loc = geocoder.geocode(query, timeout=8)
-                if loc:
-                    result = {"lat": loc.latitude, "lon": loc.longitude, "direccion": loc.address}
+                if loc and loc.latitude and loc.longitude:
+                    result = {
+                        "lat": float(loc.latitude), 
+                        "lon": float(loc.longitude), 
+                        "direccion": loc.address
+                    }
                     return result
-            except (GeocoderTimedOut, GeocoderUnavailable, GeocoderServiceError):
+                time.sleep(1)
+            except (GeocoderTimedOut, GeocoderUnavailable, GeocoderServiceError) as e:
+                print(f"Geocoder service error for '{query}': {e}")
+                time.sleep(1)
+                continue
+            except Exception as e:
+                print(f"Unexpected error for '{query}': {e}")
                 continue
     except Exception as e:
-        print(f"Geocode error: {e}")
+        print(f"General geocode error: {e}")
     return None
 
 def geocodificar_inverso(lat, lon):
     try:
-        geocoder = Nominatim(user_agent="dino_pacasmayo_app")
+        geocoder = Nominatim(user_agent="dino_pacasmayo_app", timeout=10)
         loc = geocoder.reverse((lat, lon), timeout=8)
-        if loc: return {"lat": lat, "lon": lon, "direccion": loc.address}
-    except Exception:
-        pass
-    return {"lat": lat, "lon": lon, "direccion": f"{lat:.6f}, {lon:.6f}"}
+        if loc and loc.address:
+            return {"lat": lat, "lon": lon, "direccion": loc.address}
+    except (GeocoderTimedOut, GeocoderUnavailable, GeocoderServiceError) as e:
+        print(f"Reverse geocoding error: {e}")
+    except Exception as e:
+        print(f"Unexpected reverse geocoding error: {e}")
+    return {"lat": lat, "lon": lon, "direccion": f"Lat: {lat:.6f}, Lon: {lon:.6f}"}
 
 # ===========================
 # NEGOCIO
@@ -362,7 +361,6 @@ def resumen_por_ferreteria(filtrado: pd.DataFrame, carrito: dict):
     if filtrado.empty or not carrito: return out
     grp = filtrado.groupby(["Ferreteria", "latitud", "longitud"])
     for (ferre, lat, lon), g in grp:
-        # Crear diccionario normalizado: clave normalizada -> (producto original, precio)
         precios_norm = {}
         for _, row in g.iterrows():
             prod_orig = row["Producto"]
@@ -848,6 +846,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
