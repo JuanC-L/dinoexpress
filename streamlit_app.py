@@ -301,12 +301,13 @@ base_df, precios_df, coords_df, info_df, info_lookup = leer_excel(EXCEL_PATH)
 def dist_km(a_lat, a_lon, b_lat, b_lon):
     return geodesic((a_lat, a_lon), (b_lat, b_lon)).kilometers
 
+
 @st.cache_data(show_spinner=False)
 def geocode_once(q):
-    if not q or not q.strip(): 
-        return None
+    if not q or not q.strip():  
+        return None # Mantenemos esto para entradas vacías
     try:
-        geocoder = Nominatim(user_agent="dino_pacasmayo_app", timeout=10)
+        geocoder = Nominatim(user_agent="dino_pacasmayo_app_v2", timeout=10) # Es bueno tener un user_agent único
         queries = [
             q.strip(),
             f"{q.strip()}, Lima",
@@ -319,22 +320,29 @@ def geocode_once(q):
                 loc = geocoder.geocode(query, timeout=8)
                 if loc and loc.latitude and loc.longitude:
                     result = {
-                        "lat": float(loc.latitude), 
-                        "lon": float(loc.longitude), 
+                        "lat": float(loc.latitude),  
+                        "lon": float(loc.longitude),  
                         "direccion": loc.address
                     }
                     return result
-                time.sleep(1)
+                time.sleep(1) # Espera incluso si no hay resultado, para no saturar
             except (GeocoderTimedOut, GeocoderUnavailable, GeocoderServiceError) as e:
-                print(f"Geocoder service error for '{query}': {e}")
+                # En lugar de print, preparamos un mensaje de error para devolver
+                error_message = f"Error del servicio de geocodificación: {type(e).__name__}. Intenta de nuevo en unos momentos."
+                print(f"Geocoder error for '{query}': {e}") # Puedes dejar el print para tus logs
                 time.sleep(1)
-                continue
+                continue # Prueba la siguiente query
             except Exception as e:
+                error_message = f"Ocurrió un error inesperado: {e}"
                 print(f"Unexpected error for '{query}': {e}")
                 continue
+
+        # Si el bucle termina sin encontrar nada, devuelve el último error o un mensaje genérico
+        return getattr(locals(), 'error_message', "No se encontraron resultados para la dirección proporcionada.")
+        
     except Exception as e:
         print(f"General geocode error: {e}")
-    return None
+        return f"Error general al intentar geocodificar: {e}"
 
 def geocodificar_inverso(lat, lon):
     try:
@@ -622,13 +630,22 @@ def pantalla_mapa():
                              placeholder="Ej: Av. Arequipa 123, Lima", key="addr_input")
         buscar_clicked = st.form_submit_button("🔎 Buscar")
     if buscar_clicked and addr.strip():
-        g = geocode_once(addr.strip())
-        if g:
+        resultado_geo = geocode_once(addr.strip())
+        
+        # Verificamos si el resultado es un diccionario (éxito)
+        if isinstance(resultado_geo, dict):
+            g = resultado_geo
             st.session_state["ubicacion"] = {"lat": g["lat"], "lon": g["lon"], "direccion": g["direccion"]}
             st.success(f"✅ Ubicación encontrada: {g['direccion']}")
+        
+        # Si no es un diccionario, es un mensaje de error (string)
+        elif isinstance(resultado_geo, str):
+            st.error(f"❌ {resultado_geo}") # Muestra el error específico
+        
+        # Caso por si devuelve None (ej. entrada vacía)
         else:
-            st.error("❌ No se pudo encontrar la dirección. Intenta con otra descripción o haz clic en el mapa.")
-
+            st.error("❌ No se pudo encontrar la dirección. Intenta con otra descripción.")
+      
     u = st.session_state["ubicacion"]
     st.markdown(f"""
     <div class='card-addr'>
@@ -846,6 +863,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
