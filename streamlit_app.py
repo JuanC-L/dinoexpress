@@ -322,21 +322,25 @@ base_df, precios_df, coords_df, info_df, info_lookup = leer_excel(EXCEL_PATH)
 def dist_km(a_lat, a_lon, b_lat, b_lon):
     return geodesic((a_lat, a_lon), (b_lat, b_lon)).kilometers
 
+
 @st.cache_data(show_spinner=False)
 def geocode_once(q):
-    if not q or not q.strip(): return None
+    if not q or not q.strip(): return None, None
     try:
         geocoder = Nominatim(user_agent="dino_pacasmayo_app", timeout=10)
         for query in [q.strip(), f"{q.strip()}, Lima, Perú", f"{q.strip()}, Perú"]:
             try:
                 loc = geocoder.geocode(query, timeout=8)
                 if loc:
-                    return {"lat": loc.latitude, "lon": loc.longitude, "direccion": loc.address}
-            except (GeocoderTimedOut, GeocoderUnavailable, GeocoderServiceError):
-                continue
+                    return {"lat": loc.latitude, "lon": loc.longitude, "direccion": loc.address}, None
+            except GeocoderTimedOut:
+                return None, "timeout"
+            except (GeocoderUnavailable, GeocoderServiceError) as e:
+                return None, f"servicio no disponible: {str(e)}"
     except Exception as e:
-        print(f"Geocode error: {e}")
-    return None
+        return None, f"error inesperado: {str(e)}"
+    return None, "no encontrada"
+
 
 def geocodificar_inverso(lat, lon):
     try:
@@ -846,6 +850,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
