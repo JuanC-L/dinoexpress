@@ -309,9 +309,6 @@ def geocode_once(q):
     try:
         geocoder = Nominatim(user_agent="dino_pacasmayo_app_v2", timeout=10) # Es bueno tener un user_agent único
         queries = [
-            q.strip(),
-            f"{q.strip()}, Lima",
-            f"{q.strip()}, Lima, Perú",
             f"{q.strip()}, Perú"
         ]
         
@@ -863,6 +860,7 @@ elif st.session_state["paso"] == "mapa":
     pantalla_mapa()
 else:
     pantalla_resultados()
+
 
 
 
